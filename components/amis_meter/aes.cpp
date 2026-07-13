@@ -39,8 +39,15 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 #include "aes.h"
 #if defined(ESP8266)
 #include <pgmspace.h>
-#elif defined(ESP32)
-#include <avr/pgmspace.h>
+#else
+// On ESP32 (Arduino and ESP-IDF) and other platforms const data is placed in
+// flash anyway, so PROGMEM/pgm_read_byte can be plain memory accesses.
+#ifndef PROGMEM
+#define PROGMEM
+#endif
+#ifndef pgm_read_byte
+#define pgm_read_byte(addr) (*(const uint8_t *) (addr))
+#endif
 #endif
 
 /*****************************************************************************/

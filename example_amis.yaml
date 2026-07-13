@@ -1,6 +1,7 @@
 esphome:
   name: amis
-  platform: ESP32
+
+esp32:
   board: esp-wrover-kit
 
 wifi:
@@ -21,15 +22,18 @@ logger:
 api:
 
 ota:
+  platform: esphome
 
 external_components:
-  - source: github://andyboeh/esphome-amis
-    components: amis
+  - source: github://lcnittl/esphome-amis
+    components: [amis_meter]
 
+# Required by total_daily_energy
 time:
   - platform: homeassistant
     id: homeassistant_time
 
+# The meter transmits with 9600 baud, 8 data bits, even parity, 1 stop bit
 uart:
   id: uart_bus
   tx_pin: 32
@@ -37,32 +41,95 @@ uart:
   baud_rate: 9600
   parity: EVEN
 
+amis_meter:
+  id: amis_meter_bus
+  uart_id: uart_bus
+  # 32 character hex key, obtained from the Netz OÖ customer portal
+  decryption_key: "1234567890ABCDEF1234567890ABCDEF"
+
 sensor:
-  - platform: amis
-    power_grid_key: 1234567890ABCDEF1234567890ABCDEF
-    energy_a_positive:
-      name: Energy A+
-    energy_a_negative:
-      name: Energy A-
-    reactive_energy_a_positive:
-      name: Reactive Energy A+
-    reactive_energy_a_negative:
-      name: Reactive Energy A-
-    instantaneous_power_a_positive:
-      name: "Instantaneous Power A+"
-      id: instantaneous_power_a
-    instantaneous_power_a_negative:
-      name: Instantaneous Power A-
-    reactive_instantaneous_power_a_positive:
-      name: Reactive Instantaneous Power A+
-    reactive_instantaneous_power_a_negative:
-      name: Reactive Instantaneous Power A-
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "1.8.0"
+    name: "Energy A+"
+    unit_of_measurement: Wh
+    accuracy_decimals: 0
+    device_class: energy
+    state_class: total_increasing
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "2.8.0"
+    name: "Energy A-"
+    unit_of_measurement: Wh
+    accuracy_decimals: 0
+    device_class: energy
+    state_class: total_increasing
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "3.8.1"
+    name: "Reactive Energy R+"
+    unit_of_measurement: varh
+    accuracy_decimals: 0
+    state_class: total_increasing
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "4.8.1"
+    name: "Reactive Energy R-"
+    unit_of_measurement: varh
+    accuracy_decimals: 0
+    state_class: total_increasing
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "1.7.0"
+    name: "Instantaneous Power P+"
+    id: instantaneous_power_a
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    device_class: power
+    state_class: measurement
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "2.7.0"
+    name: "Instantaneous Power P-"
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    device_class: power
+    state_class: measurement
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "3.7.0"
+    name: "Reactive Instantaneous Power Q+"
+    unit_of_measurement: var
+    accuracy_decimals: 0
+    state_class: measurement
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "4.7.0"
+    name: "Reactive Instantaneous Power Q-"
+    unit_of_measurement: var
+    accuracy_decimals: 0
+    state_class: measurement
+  # Net active power (P+ - P-), computed by the component
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "16.7.0"
+    name: "Instantaneous Power Balance"
+    unit_of_measurement: W
+    accuracy_decimals: 0
+    device_class: power
+    state_class: measurement
 
   - platform: total_daily_energy
     name: "AMIS Daily Energy"
     power_id: instantaneous_power_a
     filters:
-        # Multiplication factor from W to kW is 0.001
-        - multiply: 0.001
+      # Multiplication factor from W to kW is 0.001
+      - multiply: 0.001
     unit_of_measurement: kWh
     icon: mdi:clock-alert
+
+text_sensor:
+  - platform: amis_meter
+    amis_meter_id: amis_meter_bus
+    obis_code: "0.0.1.0.0.255"
+    name: "AMIS Timestamp"
