@@ -20,6 +20,9 @@ search request (SND_NKE) once per minute, and after the component
 acknowledges it, the meter pushes an encrypted telegram every second, which
 the component acknowledges as well.
 
+Because of the meter's one-minute search cycle it can take up to about a
+minute after boot or flashing until the first values arrive — this is normal.
+
 ## Usage
 
 Requires ESPHome 2026.6.0 or newer (the component reuses the `obis_code`
