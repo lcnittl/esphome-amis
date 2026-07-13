@@ -37,7 +37,11 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 #include <stdint.h>
 #include <string.h> // CBC mode, for memset
 #include "aes.h"
+#if defined(ESP8266)
 #include <pgmspace.h>
+#elif defined(ESP32)
+#include <avr/pgmspace.h>
+#endif
 
 /*****************************************************************************/
 /* Defines:                                                                  */
