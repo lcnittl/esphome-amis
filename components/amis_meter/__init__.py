@@ -24,29 +24,15 @@ AmisMeterComponent = amis_meter_ns.class_(
 )
 
 
-def obis_code(value):
-    """Normalize an OBIS code to the strict A.B.C.D.E.F format.
-
-    Accepts flexible notations like "1.8.0", "1-0:1.8.0" or "1.0.1.8.0.255".
-    A 3-part code (C.D.E) is expanded with A=1 (electricity), B=0 and F=255.
-    """
-    value = cv.string(value)
-    normalized = re.sub(r"[\-\:\*]", ".", value)
-    parts = normalized.split(".")
-    if len(parts) == 3:
-        parts = ["1", "0", *parts, "255"]
-    elif len(parts) == 5:
-        parts.append("255")
-    elif len(parts) != 6:
-        raise cv.Invalid("OBIS code must have 3, 5 or 6 parts")
-    try:
-        bytes_list = [int(p) for p in parts]
-    except ValueError as exc:
-        raise cv.Invalid("OBIS code parts must be integers") from exc
-    for b in bytes_list:
-        if b < 0 or b > 255:
-            raise cv.Invalid("OBIS code parts must be between 0 and 255")
-    return ".".join(str(b) for b in bytes_list)
+try:
+    # Reuse the validator of the official dlms_meter component so the accepted
+    # notations stay identical (available since ESPHome 2026.6.0).
+    from esphome.components.dlms_meter import obis_code
+except ImportError as exc:
+    raise ImportError(
+        "The amis_meter component requires ESPHome 2026.6.0 or newer "
+        "(it reuses the obis_code validator of the dlms_meter component)."
+    ) from exc
 
 
 def _decryption_key(value):
@@ -59,16 +45,19 @@ def _decryption_key(value):
     return value.upper()
 
 
-# mark the key as sensitive so frontends mask it (not available in older ESPHome)
-decryption_key = (
-    cv.sensitive(_decryption_key) if hasattr(cv, "sensitive") else _decryption_key
-)
+# mark the key as sensitive so frontends mask it
+# (cv.sensitive is not available in older ESPHome versions)
+if hasattr(cv, "sensitive"):
+    decryption_key = cv.sensitive(_decryption_key)
+else:
+    decryption_key = _decryption_key
 
 
 def _migrate_power_grid_key(config):
     if CONF_POWER_GRID_KEY in config:
         _LOGGER.warning(
-            "The 'power_grid_key' option is deprecated, please use 'decryption_key' instead."
+            "The 'power_grid_key' option is deprecated, "
+            "please use 'decryption_key' instead."
         )
         config = config.copy()
         config[CONF_DECRYPTION_KEY] = config.pop(CONF_POWER_GRID_KEY)

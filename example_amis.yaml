@@ -1,5 +1,7 @@
 esphome:
   name: amis
+  # amis_meter reuses the obis_code validator introduced in ESPHome 2026.6.0
+  min_version: 2026.6.0
 
 esp32:
   board: esp-wrover-kit
@@ -50,7 +52,7 @@ amis_meter:
 sensor:
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "1.8.0"
+    obis_code: "1.0.1.8.0.255"
     name: "Energy A+"
     unit_of_measurement: Wh
     accuracy_decimals: 0
@@ -58,7 +60,7 @@ sensor:
     state_class: total_increasing
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "2.8.0"
+    obis_code: "1.0.2.8.0.255"
     name: "Energy A-"
     unit_of_measurement: Wh
     accuracy_decimals: 0
@@ -66,21 +68,21 @@ sensor:
     state_class: total_increasing
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "3.8.1"
+    obis_code: "1.0.3.8.1.255"
     name: "Reactive Energy R+"
     unit_of_measurement: varh
     accuracy_decimals: 0
     state_class: total_increasing
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "4.8.1"
+    obis_code: "1.0.4.8.1.255"
     name: "Reactive Energy R-"
     unit_of_measurement: varh
     accuracy_decimals: 0
     state_class: total_increasing
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "1.7.0"
+    obis_code: "1.0.1.7.0.255"
     name: "Instantaneous Power P+"
     id: instantaneous_power_a
     unit_of_measurement: W
@@ -89,31 +91,40 @@ sensor:
     state_class: measurement
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "2.7.0"
+    obis_code: "1.0.2.7.0.255"
     name: "Instantaneous Power P-"
+    id: instantaneous_power_a_negative
     unit_of_measurement: W
     accuracy_decimals: 0
     device_class: power
     state_class: measurement
+    # P- is published right after P+ from the same telegram, so computing the
+    # balance here guarantees both operands belong to the same telegram
+    on_value:
+      - sensor.template.publish:
+          id: instantaneous_power_balance
+          state: !lambda return id(instantaneous_power_a).state - x;
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "3.7.0"
+    obis_code: "1.0.3.7.0.255"
     name: "Reactive Instantaneous Power Q+"
     unit_of_measurement: var
     accuracy_decimals: 0
     state_class: measurement
   - platform: amis_meter
     amis_meter_id: amis_meter_bus
-    obis_code: "4.7.0"
+    obis_code: "1.0.4.7.0.255"
     name: "Reactive Instantaneous Power Q-"
     unit_of_measurement: var
     accuracy_decimals: 0
     state_class: measurement
-  # Net active power (P+ - P-), computed by the component
-  - platform: amis_meter
-    amis_meter_id: amis_meter_bus
-    obis_code: "16.7.0"
+
+  # Net active power (P+ - P-), updated once per telegram via the
+  # on_value automation of the P- sensor above
+  - platform: template
     name: "Instantaneous Power Balance"
+    id: instantaneous_power_balance
+    update_interval: never
     unit_of_measurement: W
     accuracy_decimals: 0
     device_class: power
@@ -123,7 +134,6 @@ sensor:
     name: "AMIS Daily Energy"
     power_id: instantaneous_power_a
     filters:
-      # Multiplication factor from W to kW is 0.001
       - multiply: 0.001
     unit_of_measurement: kWh
     icon: mdi:clock-alert

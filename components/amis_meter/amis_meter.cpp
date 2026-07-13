@@ -1,12 +1,11 @@
 #include "amis_meter.h"
-#include "aes.h"
+#include "aes128_cbc.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include "esphome/core/time.h"
 
 #include <algorithm>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <ctime>
 
 namespace esphome {
 namespace amis_meter {
@@ -35,7 +34,6 @@ static const char *const OBIS_ACTIVE_POWER_PLUS = "1.0.1.7.0.255";       // 1.7.
 static const char *const OBIS_ACTIVE_POWER_MINUS = "1.0.2.7.0.255";      // 2.7.0, power P- [W]
 static const char *const OBIS_REACTIVE_POWER_PLUS = "1.0.3.7.0.255";     // 3.7.0, power Q+ [var]
 static const char *const OBIS_REACTIVE_POWER_MINUS = "1.0.4.7.0.255";    // 4.7.0, power Q- [var]
-static const char *const OBIS_ACTIVE_POWER_BALANCE = "1.0.16.7.0.255";   // 16.7.0 = P+ - P- [W]
 static const char *const OBIS_PREPAYMENT_COUNTER = "1.0.1.128.0.255";    // 1.128.0, Inkassozaehlwerk
 
 static uint8_t dif2len(uint8_t dif) {
@@ -85,15 +83,8 @@ static uint32_t read_le_uint(const uint8_t *data, size_t len) {
 }
 
 void AmisMeterComponent::set_decryption_key(const std::string &decryption_key) {
-  if (decryption_key.length() != 32) {
+  if (!parse_hex(decryption_key, this->key_, 16)) {
     ESP_LOGE(TAG, "Decryption key must be 32 hexadecimal characters");
-    return;
-  }
-  char temp[3] = {0};
-  for (size_t i = 0; i < 16; i++) {
-    temp[0] = decryption_key[2 * i];
-    temp[1] = decryption_key[2 * i + 1];
-    this->key_[i] = (uint8_t) strtoul(temp, nullptr, 16);
   }
 }
 
@@ -243,11 +234,10 @@ bool AmisMeterComponent::decrypt_frame_() {
   for (size_t i = 8; i < 16; i++)
     iv[i] = this->buffer_[15];
 
-  AES128_CBC_decrypt_buffer(this->decrypted_, this->buffer_ + OFFS_ENCRYPTED, 16, this->key_, iv);
-  AES128_CBC_decrypt_buffer(this->decrypted_ + 16, this->buffer_ + OFFS_ENCRYPTED + 16, 16, nullptr, nullptr);
-  AES128_CBC_decrypt_buffer(this->decrypted_ + 32, this->buffer_ + OFFS_ENCRYPTED + 32, 16, nullptr, nullptr);
-  AES128_CBC_decrypt_buffer(this->decrypted_ + 48, this->buffer_ + OFFS_ENCRYPTED + 48, 16, nullptr, nullptr);
-  AES128_CBC_decrypt_buffer(this->decrypted_ + 64, this->buffer_ + OFFS_ENCRYPTED + 64, 16, nullptr, nullptr);
+  if (!aes128_cbc_decrypt(this->key_, iv, this->buffer_ + OFFS_ENCRYPTED, this->decrypted_, AMIS_DECRYPTED_SIZE)) {
+    ESP_LOGE(TAG, "Decryption error");
+    return false;
+  }
 
   if (this->decrypted_[0] != 0x2F || this->decrypted_[1] != 0x2F) {
     ESP_LOGE(TAG, "Decryption failed, please check your decryption_key");
@@ -258,10 +248,6 @@ bool AmisMeterComponent::decrypt_frame_() {
 
 void AmisMeterComponent::parse_frame_() {
   size_t i = 2;  // skip the leading 0x2F 0x2F filler bytes
-  bool have_p_plus = false;
-  bool have_p_minus = false;
-  uint32_t p_plus = 0;
-  uint32_t p_minus = 0;
 
   while (i < AMIS_DECRYPTED_SIZE) {
     const uint8_t dif = this->decrypted_[i];
@@ -301,23 +287,23 @@ void AmisMeterComponent::parse_frame_() {
       if ((data[1] & 0x80) == 0x80) {
         ESP_LOGD(TAG, "Meter time invalid, skipping timestamp");
       } else {
-        struct tm t {};
-        t.tm_sec = data[0] & 0x3F;
-        t.tm_min = data[1] & 0x3F;
-        t.tm_hour = data[2] & 0x1F;
-        t.tm_mday = data[3] & 0x1F;
-        t.tm_mon = data[4] & 0x0F;
-        if (t.tm_mon > 0)
-          t.tm_mon -= 1;
-        t.tm_year = 100 + (((data[3] & 0xE0) >> 5) | ((data[4] & 0xF0) >> 1));
-        t.tm_isdst = ((data[0] & 0x40) == 0x40) ? 1 : 0;
+        ESPTime time{};
+        time.second = data[0] & 0x3F;
+        time.minute = data[1] & 0x3F;
+        time.hour = data[2] & 0x1F;
+        time.day_of_month = data[3] & 0x1F;
+        time.month = data[4] & 0x0F;
+        time.year = 2000 + (((data[3] & 0xE0) >> 5) | ((data[4] & 0xF0) >> 1));
+        time.is_dst = (data[0] & 0x40) == 0x40;
+        time.recalc_timestamp_local();
 
         char iso[20];
-        snprintf(iso, sizeof(iso), "%04d-%02d-%02dT%02d:%02d:%02d", 1900 + t.tm_year, t.tm_mon + 1, t.tm_mday,
-                 t.tm_hour, t.tm_min, t.tm_sec);
-        ESP_LOGV(TAG, "%s: %s", OBIS_TIMESTAMP, iso);
-        this->publish_value_(OBIS_TIMESTAMP, mktime(&t));
-        this->publish_text_(OBIS_TIMESTAMP, iso);
+        if (time.strftime(iso, sizeof(iso), "%Y-%m-%dT%H:%M:%S") != 0) {
+          ESP_LOGV(TAG, "%s: %s", OBIS_TIMESTAMP, iso);
+          this->publish_text_(OBIS_TIMESTAMP, iso);
+        }
+        if (time.timestamp != -1)
+          this->publish_value_(OBIS_TIMESTAMP, time.timestamp);
       }
     } else if (dif == 0x04 && vif == 0x03) {
       // 1.8.0
@@ -333,14 +319,10 @@ void AmisMeterComponent::parse_frame_() {
       this->publish_value_(OBIS_REACTIVE_ENERGY_MINUS, read_le_uint(data, data_len));
     } else if (dif == 0x04 && vif == 0x2B) {
       // 1.7.0
-      p_plus = read_le_uint(data, data_len);
-      have_p_plus = true;
-      this->publish_value_(OBIS_ACTIVE_POWER_PLUS, p_plus);
+      this->publish_value_(OBIS_ACTIVE_POWER_PLUS, read_le_uint(data, data_len));
     } else if (dif == 0x04 && vif == 0xAB && vife == 0x3C) {
       // 2.7.0
-      p_minus = read_le_uint(data, data_len);
-      have_p_minus = true;
-      this->publish_value_(OBIS_ACTIVE_POWER_MINUS, p_minus);
+      this->publish_value_(OBIS_ACTIVE_POWER_MINUS, read_le_uint(data, data_len));
     } else if (dif == 0x04 && dife == 0x00 && vif == 0xFB && vife == 0x14) {
       // 3.7.0
       this->publish_value_(OBIS_REACTIVE_POWER_PLUS, read_le_uint(data, data_len));
@@ -356,10 +338,6 @@ void AmisMeterComponent::parse_frame_() {
 
     i += data_len;
   }
-
-  // 16.7.0: net active power, computed from 1.7.0 - 2.7.0
-  if (have_p_plus && have_p_minus)
-    this->publish_value_(OBIS_ACTIVE_POWER_BALANCE, (float) ((int64_t) p_plus - (int64_t) p_minus));
 
   ESP_LOGD(TAG, "Frame decoded");
 }
