@@ -51,49 +51,49 @@ amis_meter:
 
 sensor:
   - platform: amis_meter
+    name: Energy A+
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.1.8.0.255"
-    name: "Energy A+"
+    obis_code: 1.0.1.8.0.255
     unit_of_measurement: Wh
     accuracy_decimals: 0
     device_class: energy
     state_class: total_increasing
   - platform: amis_meter
+    name: Energy A-
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.2.8.0.255"
-    name: "Energy A-"
+    obis_code: 1.0.2.8.0.255
     unit_of_measurement: Wh
     accuracy_decimals: 0
     device_class: energy
     state_class: total_increasing
   - platform: amis_meter
+    name: Reactive Energy R+
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.3.8.1.255"
-    name: "Reactive Energy R+"
+    obis_code: 1.0.3.8.1.255
     unit_of_measurement: varh
     accuracy_decimals: 0
     state_class: total_increasing
   - platform: amis_meter
+    name: Reactive Energy R-
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.4.8.1.255"
-    name: "Reactive Energy R-"
+    obis_code: 1.0.4.8.1.255
     unit_of_measurement: varh
     accuracy_decimals: 0
     state_class: total_increasing
   - platform: amis_meter
+    name: Instantaneous Power P+
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.1.7.0.255"
-    name: "Instantaneous Power P+"
+    obis_code: 1.0.1.7.0.255
     id: instantaneous_power_a
     unit_of_measurement: W
     accuracy_decimals: 0
     device_class: power
     state_class: measurement
   - platform: amis_meter
-    amis_meter_id: amis_meter_bus
-    obis_code: "1.0.2.7.0.255"
-    name: "Instantaneous Power P-"
+    name: Instantaneous Power P-
     id: instantaneous_power_a_negative
+    amis_meter_id: amis_meter_bus
+    obis_code: 1.0.2.7.0.255
     unit_of_measurement: W
     accuracy_decimals: 0
     device_class: power
@@ -105,16 +105,16 @@ sensor:
           id: instantaneous_power_balance
           state: !lambda return id(instantaneous_power_a).state - x;
   - platform: amis_meter
+    name: Reactive Instantaneous Power Q+
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.3.7.0.255"
-    name: "Reactive Instantaneous Power Q+"
+    obis_code: 1.0.3.7.0.255
     unit_of_measurement: var
     accuracy_decimals: 0
     state_class: measurement
   - platform: amis_meter
+    name: Reactive Instantaneous Power Q-
     amis_meter_id: amis_meter_bus
-    obis_code: "1.0.4.7.0.255"
-    name: "Reactive Instantaneous Power Q-"
+    obis_code: 1.0.4.7.0.255
     unit_of_measurement: var
     accuracy_decimals: 0
     state_class: measurement
@@ -122,7 +122,7 @@ sensor:
   # Net active power (P+ - P-), updated once per telegram via the
   # on_value automation of the P- sensor above
   - platform: template
-    name: "Instantaneous Power Balance"
+    name: Instantaneous Power Balance
     id: instantaneous_power_balance
     update_interval: never
     unit_of_measurement: W
@@ -131,7 +131,7 @@ sensor:
     state_class: measurement
 
   - platform: total_daily_energy
-    name: "AMIS Daily Energy"
+    name: AMIS Daily Energy
     power_id: instantaneous_power_a
     filters:
       - multiply: 0.001
@@ -140,6 +140,6 @@ sensor:
 
 text_sensor:
   - platform: amis_meter
+    name: AMIS Timestamp
     amis_meter_id: amis_meter_bus
-    obis_code: "0.0.1.0.0.255"
-    name: "AMIS Timestamp"
+    obis_code: 0.0.1.0.0.255
