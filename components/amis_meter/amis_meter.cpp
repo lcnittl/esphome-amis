@@ -103,7 +103,6 @@ void AmisMeterComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "    OBIS code: %s", item.obis_code.c_str());
   }
 #endif
-  this->check_uart_settings(9600, 1, uart::UART_CONFIG_PARITY_EVEN, 8);
 }
 
 void AmisMeterComponent::loop() {
