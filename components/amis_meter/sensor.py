@@ -14,7 +14,13 @@ from esphome.const import (
     UNIT_WATT_HOURS,
 )
 
-from . import CONF_AMIS_METER_ID, CONF_OBIS_CODE, AmisMeterComponent, obis_code
+from . import (
+    CONF_AMIS_METER_ID,
+    CONF_OBIS_CODE,
+    AmisMeterComponent,
+    obis_string_to_byte_list,
+    register_sensor,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +41,7 @@ NUMERIC_KEYS = {
 DYNAMIC_SCHEMA = sensor.sensor_schema().extend(
     {
         cv.GenerateID(CONF_AMIS_METER_ID): cv.use_id(AmisMeterComponent),
-        cv.Required(CONF_OBIS_CODE): obis_code,
+        cv.Required(CONF_OBIS_CODE): obis_string_to_byte_list,
     }
 )
 
@@ -113,7 +119,7 @@ async def to_code(config):
 
     if obis := config.get(CONF_OBIS_CODE):
         var = await sensor.new_sensor(config)
-        cg.add(hub.register_sensor(obis, var))
+        register_sensor(hub, obis, var)
     else:
         for key, obis_val in NUMERIC_KEYS.items():
             if sensor_config := config.get(key):

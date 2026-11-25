@@ -25,8 +25,8 @@ minute after boot or flashing until the first values arrive — this is normal.
 
 ## Usage
 
-Requires ESPHome 2026.6.0 or newer (the component reuses the `obis_code`
-validator of `dlms_meter`).
+Requires ESPHome 2026.11.0 or newer (the component reuses the
+`obis_string_to_byte_list` validator of `dlms_meter`).
 
 You need the AES key ("power grid key") from Netz OÖ GmbH. You can request it
 online in the [customer portal](https://eservice.netzooe.at). Copy the

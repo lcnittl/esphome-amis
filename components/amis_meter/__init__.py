@@ -4,7 +4,9 @@ import re
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart
+from esphome.components.dlms_meter import obis_string_to_byte_list
 from esphome.const import CONF_ID
+from esphome.cpp_generator import MockObj
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,15 +26,12 @@ AmisMeterComponent = amis_meter_ns.class_(
 )
 
 
-try:
-    # Reuse the validator of the official dlms_meter component so the accepted
-    # notations stay identical (available since ESPHome 2026.6.0).
-    from esphome.components.dlms_meter import obis_code
-except ImportError as exc:
-    raise ImportError(
-        "The amis_meter component requires ESPHome 2026.6.0 or newer "
-        "(it reuses the obis_code validator of the dlms_meter component)."
-    ) from exc
+def register_sensor(hub: MockObj, obis: list[int], var: MockObj) -> None:
+    cg.add(hub.register_sensor(".".join(str(part) for part in obis), var))
+
+
+def register_text_sensor(hub: MockObj, obis: list[int], var: MockObj) -> None:
+    cg.add(hub.register_text_sensor(".".join(str(part) for part in obis), var))
 
 
 def _decryption_key(value):
